@@ -1,15 +1,49 @@
-
+===============================================
+// flutter side, get data from sharepreferences for auto login
+===============================================
 class ExistingUser{
-constructor(uid) {
-        this.uid = uid;  //get from sharepreferences
+final String uid;
+  final String phone;
+  final String role;
+
+  ExistingUser({required this.uid, required this.phone, required this.role});
+
+  // 💡 核心功能：提供一个工厂构造函数，直接从 SharedPreferences 中抽取数据
+  static Future<ExistingUser?> fromSharedPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    final String? uid = prefs.getString('uid');
+    final String? phone = prefs.getString('phone');
+    final String? role = prefs.getString('role');
+
+    // 如果任何一个核心登录凭证丢失，说明用户之前没登录成功，或者登出了
+    if (uid == null || phone == null || role == null) {
+      return null; 
     }
 
+    return ExistingUser(uid: uid, phone: phone, role: role);
+  }
 
-//user login process
+
+  // 💡 将对象转为 JSON 格式，方便用 Dio 传给后端
+  Map<String, dynamic> toJson() {
+    return {
+      'uid': uid,
+      'phone': phone,
+      'role': role,
+    };
+  }
+}
+
+
+===================================================
+//server side (backend) - user login process
+===================================================
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const validator = require("validator");
 const bcrypt = require("bcryptjs"); // 💡 新增：用于密码加密，保障网络安全
+const crypto = require("crypto");   // Node.js 原生模块，用于生成随机 UID
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -23,7 +57,7 @@ exports.registerUser = onRequest(async (req, res) => {
     }
 
     try {
-        const { uid, name, phone, password } = req.body;
+        const {name, phone, password } = req.body;
 
         // 验证必填
         if (!name || validator.isEmpty(name.trim())) return res.status(400).json({ status: "error", message: "Name required" });
@@ -71,7 +105,8 @@ exports.registerUser = onRequest(async (req, res) => {
 });
 
 /**
- * 2. 🔑 用户登录流程 (Login / Sign In)
+ * 2. 🔑 密码登录通路 (Password Login / 强鉴权)
+功能：处理初次登录或手动登录，比对前端传来的明文密码与数据库中的密文。
  */
 exports.loginUser = onRequest(async (req, res) => {
     if (req.method !== "POST") {
@@ -120,6 +155,65 @@ exports.loginUser = onRequest(async (req, res) => {
 
     } catch (error) {
         console.error("Login Error:", error);
+        return res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
+/**
+ * ============================================================================
+ * 3. 🔄 自动登录通路 (Auto Login via Cache / 弱鉴权会话恢复)
+ * ============================================================================
+ * 功能：App 启动时静默触发。本地无密码，利用缓存的 uid 和 phone 进行双重交叉验证。
+ */
+exports.autoLoginUser = onRequest(async (req, res) => {
+    if (req.method !== "POST") {
+        return res.status(405).json({ status: "error", message: "Only POST allowed" });
+    }
+
+    try {
+        // 接收前端从 SharedPreferences 中抽取的缓存凭证
+        const { uid, phone, role } = req.body;
+
+        if (!uid || !phone || !role) {
+            return res.status(400).json({ status: "error", message: "Missing login credentials" });
+        }
+
+        const safeUid = uid.trim();
+        const safePhone = validator.escape(phone.trim());
+
+        // 核心校验第一步：以 UID 主键直接定位 Firestore 文档
+        const userDoc = await db.collection("users").doc(safeUid).get();
+
+        if (!userDoc.exists) {
+            return res.status(401).json({ status: "error", message: "Session expired, please re-login" });
+        }
+
+        const userData = userDoc.data();
+
+        // 核心校验第二步（防篡改）：比对数据库权威手机号和前端提交的手机号是否一致
+        if (userData.phone !== safePhone) {
+            return res.status(401).json({ status: "error", message: "Invalid security token" });
+        }
+
+        // 核心校验第三步（防越权）：确保用户角色信息一致
+        if (userData.role !== role) {
+            return res.status(401).json({ status: "error", message: "Role mismatch error" });
+        }
+
+        // 校验全部通过，安全放行，并返回服务器最新鲜的数据（防止用户在其他设备修改了名字）
+        return res.status(200).json({
+            status: "success",
+            message: "Auto login successful",
+            data: {
+                uid: userData.uid,
+                name: userData.name,
+                phone: userData.phone,
+                role: userData.role
+            }
+        });
+
+    } catch (error) {
+        console.error("Auto Login Error:", error);
         return res.status(500).json({ status: "error", message: "Internal server error" });
     }
 });
