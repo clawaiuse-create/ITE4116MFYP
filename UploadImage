@@ -6,6 +6,30 @@ import 'package:dio/dio.dart';
 
 final Dio _dio = Dio();
 
+List<dynamic>? recognitions = await Tflite.detectObjectOnFrame(
+  bytesList: img.planes.map((plane) => plane.bytes).toList(),
+  model: "YOLO",
+  // ... 其他參數
+);
+
+if (recognitions != null && recognitions.isNotEmpty) {
+  for (var result in recognitions) {
+    // 💡 核心：直接從結果中抽取 classIndex 和 confidence
+    double confidence = result['confidenceInClass']; // 置信度 (例如 0.74)
+
+    // 🎯 觸法你的業務邏輯：當置信度低於 80% 時
+    if (confidence < 0.80) {
+      int classIndex = result['index'];        // 👈 這就是你要的 classIndex！(例如 0 代表人, 2 代表車)
+      String className = result['detectedClass']; // 👈 這就是類別名稱 (例如 "car")
+
+      print("检测到低置信度物体！Index: $classIndex, Name: $className, Score: $confidence");
+
+      // 接下來呼叫拍照上傳函數，把這三個變數傳給你的 JSON 結構
+      // triggerPhotoAndUpload(classIndex, className, confidence);
+    }
+  }
+}
+
 Future<void> uploadLowConfidenceDetection({
   required String uid,
   required String storageImageUrl, // 对应你构思的 imageID / url
