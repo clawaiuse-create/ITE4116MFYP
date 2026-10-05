@@ -1,1 +1,14 @@
+class connectServer{
 
+function connectServer(){
+
+const { onRequest } = require("firebase-functions/v2/https");
+const admin = require("firebase-admin");
+const validator = require("validator");
+const bcrypt = require("bcryptjs"); // 💡 新增：用于密码加密，保障网络安全
+const crypto = require("crypto");   // Node.js 原生模块，用于生成随机 UID
+
+admin.initializeApp();
+const db = admin.firestore();
+}
+}
