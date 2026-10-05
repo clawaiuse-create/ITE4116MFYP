@@ -1,12 +1,7 @@
-//user class and constructor, data get from sharepreferences
+
 class ExistingUser{
-constructor(uid, name, phone, password, role) {
-        this.uid = uid;
-        this.name = name;    //使用者名稱
-        this.phone = phone;   //login PK
-        this.password = password;  //密碼
-        this.role = role;   //default normalUser
-        this.createdAt = new Date();
+constructor(uid) {
+        this.uid = uid;  //get from sharepreferences
     }
 
 
