@@ -76,13 +76,13 @@ exports.uploadYOLORecord = onRequest(async (req, res) => {
 
     try {
         // 💡 顺应你的建议，彻底拿掉了 description，只保留最核心的三个 YOLO 字段
-        const { imageID, uID, aiSuggestedLabel } = req.body;
+        const { imageID, uID, aiSuggestedLabel,confidenceScore } = req.body;
 
         // 1. 基础字段验证
         if (!imageID || validator.isEmpty(imageID.trim())) return res.status(400).json({ status: "error", message: "imageID (URL) required" });
         if (!uID || validator.isEmpty(uID.trim())) return res.status(400).json({ status: "error", message: "uID required" });
         if (!aiSuggestedLabel) return res.status(400).json({ status: "error", message: "aiSuggestedLabel object required" });
-
+        if (!confidenceScore) return res.status(400).json({ status: "error", message: "confidenceScore required" });
         // 2. 嵌套对象属性解构与验证
         const { classIndex, className, confidenceScore } = aiSuggestedLabel;
         if (classIndex === undefined || !className || confidenceScore === undefined) {
