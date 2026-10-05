@@ -1,4 +1,4 @@
-class connectServer{
+class ConnectServer{
 
 function connectServer(){
 
