@@ -1,5 +1,5 @@
-//user class and constructor
-class User{
+//user class and constructor, data get from sharepreferences
+class ExistingUser{
 constructor(uid, name, phone, password, role) {
         this.uid = uid;
         this.name = name;    //使用者名稱
@@ -8,6 +8,7 @@ constructor(uid, name, phone, password, role) {
         this.role = role;   //default normalUser
         this.createdAt = new Date();
     }
+
 
 //user login process
 const { onRequest } = require("firebase-functions/v2/https");
@@ -30,19 +31,13 @@ exports.registerUser = onRequest(async (req, res) => {
         const { uid, name, phone, password } = req.body;
 
         // 验证必填
-        if (!uid || validator.isEmpty(uid.trim())) return res.status(400).json({ status: "error", message: "Invalid UID" });
         if (!name || validator.isEmpty(name.trim())) return res.status(400).json({ status: "error", message: "Name required" });
         if (!phone || validator.isEmpty(phone.trim())) return res.status(400).json({ status: "error", message: "Phone required" });
         if (!password || validator.isEmpty(password.trim())) return res.status(400).json({ status: "error", message: "Password required" });
 
         // 数据清理
-        const safeUid = uid.trim();
         const safeName = validator.escape(name.trim());
         const safePhone = validator.escape(phone.trim());
-
-        // 💡 密码安全核心：加盐加密（Salt Hashing），绝对不能明文存入数据库，也不能做 escape
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password.trim(), salt);
 
         // 检查手机号是否已被注册
         const userCheck = await db.collection("users").where("phone", "==", safePhone).get();
@@ -50,8 +45,14 @@ exports.registerUser = onRequest(async (req, res) => {
             return res.status(400).json({ status: "error", message: "Phone number already registered" });
         }
 
+        const generatedUid = crypto.randomUUID();
+
+        // 💡 密码安全核心：加盐加密（Salt Hashing），绝对不能明文存入数据库，也不能做 escape
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password.trim(), salt);
+
         const userObject = {
-            uid: safeUid,
+            uid: generatedUid,
             name: safeName,
             phone: safePhone,
             password: hashedPassword, // 存入加密后的密文
