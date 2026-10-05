@@ -41,9 +41,6 @@ final String uid;
 ===================================================
 ConnectServer.connectServer();
 
-admin.initializeApp();
-const db = admin.firestore();
-
 /**
  * 1. 🛠️ 用户注册流程 (Register / Sign Up)
  */
